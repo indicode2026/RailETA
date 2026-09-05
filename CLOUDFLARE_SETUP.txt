@@ -1,0 +1,19 @@
+RAILETA — FINAL DEPLOYMENT
+
+1. Upload every file in this folder to the ROOT of your GitHub repository.
+2. Cloudflare Workers -> raileta -> Settings -> Builds:
+   Root directory: /
+   Build command: none
+   Deploy command: npx wrangler deploy
+3. Add Worker Secret:
+   RAILRADAR_API_KEY = your RailRadar API key
+4. Deploy.
+5. Test:
+   https://YOUR-WORKER.workers.dev/health
+6. Open the Worker website.
+
+IMPORTANT:
+- The website DOES NOT request browser location permission.
+- Users search the railway station directory by station name, city, or code.
+- Selecting a station loads its train timetable through the Worker.
+- Keep RAILRADAR_API_KEY only in Cloudflare Worker Secrets; never put it in app.js or GitHub.

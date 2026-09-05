@@ -1,0 +1,7 @@
+name = "raileta"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Add the secret in Cloudflare Dashboard:
+# Settings -> Variables and Secrets -> Add Secret
+# Name: RAILRADAR_API_KEY

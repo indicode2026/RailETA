@@ -10,8 +10,10 @@ const listEl = document.getElementById("stationList");
 const summaryEl = document.getElementById("summary");
 const detailEl = document.getElementById("stationDetail");
 
-let allStations = [];
-let visibleStations = [];
+const FALLBACK_STATIONS = [{"code": "NDLS", "name": "New Delhi", "city": "Delhi"}, {"code": "NZM", "name": "Hazrat Nizamuddin", "city": "Delhi"}, {"code": "DLI", "name": "Old Delhi Junction", "city": "Delhi"}, {"code": "DEE", "name": "Delhi Sarai Rohilla", "city": "Delhi"}, {"code": "ANVT", "name": "Anand Vihar Terminal", "city": "Delhi"}, {"code": "AGC", "name": "Agra Cantt", "city": "Agra"}, {"code": "CNB", "name": "Kanpur Central", "city": "Kanpur"}, {"code": "LKO", "name": "Lucknow", "city": "Lucknow"}, {"code": "HWH", "name": "Howrah Junction", "city": "Kolkata"}, {"code": "SDAH", "name": "Sealdah", "city": "Kolkata"}, {"code": "BCT", "name": "Mumbai Central", "city": "Mumbai"}, {"code": "CSMT", "name": "Chhatrapati Shivaji Maharaj Terminus", "city": "Mumbai"}, {"code": "MMCT", "name": "Mumbai Central", "city": "Mumbai"}, {"code": "PUNE", "name": "Pune Junction", "city": "Pune"}, {"code": "ADI", "name": "Ahmedabad Junction", "city": "Ahmedabad"}, {"code": "JP", "name": "Jaipur Junction", "city": "Jaipur"}, {"code": "BPL", "name": "Bhopal Junction", "city": "Bhopal"}, {"code": "INDB", "name": "Indore Junction", "city": "Indore"}, {"code": "JBP", "name": "Jabalpur Junction", "city": "Jabalpur"}, {"code": "NGP", "name": "Nagpur Junction", "city": "Nagpur"}, {"code": "HYB", "name": "Hyderabad Deccan", "city": "Hyderabad"}, {"code": "SC", "name": "Secunderabad Junction", "city": "Hyderabad"}, {"code": "MAS", "name": "Chennai Central", "city": "Chennai"}, {"code": "SBC", "name": "KSR Bengaluru City Junction", "city": "Bengaluru"}, {"code": "YPR", "name": "Yesvantpur Junction", "city": "Bengaluru"}, {"code": "VSKP", "name": "Visakhapatnam", "city": "Visakhapatnam"}, {"code": "BBS", "name": "Bhubaneswar", "city": "Bhubaneswar"}, {"code": "PURI", "name": "Puri", "city": "Puri"}, {"code": "GKP", "name": "Gorakhpur Junction", "city": "Gorakhpur"}, {"code": "PNBE", "name": "Patna Junction", "city": "Patna"}];
+
+let allStations = FALLBACK_STATIONS.slice();
+let visibleStations = allStations.slice();
 
 function setError(message) {
   errorEl.textContent = message;
@@ -24,26 +26,66 @@ function escapeHtml(s) {
   }[c]));
 }
 
+function normalizeStationList(data) {
+  const raw =
+    Array.isArray(data) ? data :
+    Array.isArray(data?.stations) ? data.stations :
+    Array.isArray(data?.results) ? data.results :
+    data && typeof data === "object" ? Object.entries(data).map(([code, value]) => {
+      if (value && typeof value === "object") return { code, ...value };
+      return { code, name: value };
+    }) : [];
+
+  return raw.map(x => {
+    if (typeof x === "string") return { code: "", name: x };
+    const code = x?.code || x?.stationCode || x?.station_code || x?.station_code_name || "";
+    const name = x?.name || x?.stationName || x?.station_name || x?.label || "";
+    const city = x?.city || x?.cityName || "";
+    return { code: String(code).toUpperCase(), name: String(name), city: String(city) };
+  }).filter(s => s.name || s.code);
+}
+
 async function loadStationDirectory() {
   setError("");
-  statusEl.textContent = "Loading Indian railway stations…";
+  // Never leave the user with a blank screen while the remote directory loads.
+  allStations = FALLBACK_STATIONS.slice();
+  renderStations(allStations);
+  statusEl.textContent = `${allStations.length} popular railway stations shown. Loading the full directory…`;
+
   try {
-    const res = await fetch(`${WORKER_BASE}/stations/directory`);
+    const res = await fetch(`${WORKER_BASE}/stations/directory`, { cache: "no-store" });
     const body = await res.json();
-    if (!res.ok || !body?.success) throw new Error(body?.error || `Station directory failed (HTTP ${res.status})`);
+    if (!res.ok || !body?.success) throw new Error(body?.error?.message || body?.error || `Station directory failed (HTTP ${res.status})`);
 
-    allStations = Object.entries(body.data || {})
-      .map(([code, name]) => ({ code: String(code).toUpperCase(), name: String(name) }))
-      .filter(s => s.code && s.name)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const remote = normalizeStationList(body.data).map(s => ({
+      ...s,
+      name: s.name || s.code
+    }));
 
-    visibleStations = allStations;
-    renderStations(visibleStations);
-    statusEl.textContent = `${allStations.length.toLocaleString()} railway stations available. Search by station name or code.`;
+    const merged = new Map();
+    [...FALLBACK_STATIONS, ...remote].forEach(s => {
+      const key = s.code || `${s.name}|${s.city}`;
+      if (!merged.has(key)) merged.set(key, s);
+    });
+
+    allStations = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+    renderStations(allStations);
+    statusEl.textContent = `${allStations.length.toLocaleString()} railway stations available. Search by station name, city, or code.`;
   } catch (e) {
-    setError(e.message || "Could not load the railway station directory.");
-    statusEl.textContent = "Station directory unavailable.";
+    // Keep the fallback stations visible; search can still work for common stations.
+    allStations = FALLBACK_STATIONS.slice();
+    renderStations(allStations);
+    statusEl.textContent = `Showing ${allStations.length} popular railway stations. Search also works through the live station directory.`;
   }
+}
+
+async function searchRemoteStations(q) {
+  const res = await fetch(`${WORKER_BASE}/stations/search?q=${encodeURIComponent(q)}&limit=50`, { cache: "no-store" });
+  const body = await res.json();
+  if (!res.ok || !body?.success) {
+    throw new Error(body?.error?.message || body?.error || `Station search failed (HTTP ${res.status})`);
+  }
+  return normalizeStationList(body.data).map(s => ({ ...s, name: s.name || s.code }));
 }
 
 function renderStations(stations) {
@@ -66,31 +108,52 @@ function renderStations(stations) {
     const el = document.createElement("button");
     el.className = "station";
     el.type = "button";
-    el.innerHTML = `<div class="stationMain"><div class="num">${i + 1}</div><div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${escapeHtml(s.code)} · Indian Railways station</div></div></div><div class="arrow">→</div>`;
+    el.innerHTML = `<div class="stationMain"><div class="num">${i + 1}</div><div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${escapeHtml(s.code)}${s.city ? ` · ${escapeHtml(s.city)}` : ""} · Indian Railways station</div></div></div><div class="arrow">→</div>`;
     el.addEventListener("click", () => loadBoard(s));
     listEl.appendChild(el);
   });
 }
 
-function searchStations() {
-  const q = searchInput.value.trim().toLowerCase();
+async function searchStations() {
+  const q = searchInput.value.trim();
   setError("");
+
   if (!q) {
     renderStations(allStations);
     statusEl.textContent = `${allStations.length.toLocaleString()} railway stations available.`;
     return;
   }
 
-  const tokens = q.split(/\s+/).filter(Boolean);
-  const filtered = allStations.filter(s => {
-    const hay = `${s.code} ${s.name}`.toLowerCase();
+  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const local = allStations.filter(s => {
+    const hay = `${s.code} ${s.name} ${s.city || ""}`.toLowerCase();
     return tokens.every(t => hay.includes(t));
   });
 
-  renderStations(filtered);
-  statusEl.textContent = filtered.length
-    ? `Search results for “${searchInput.value.trim()}”.`
-    : "No matching railway station found.";
+  if (local.length) {
+    renderStations(local);
+    statusEl.textContent = `Search results for “${q}”.`;
+    return;
+  }
+
+  try {
+    const remote = await searchRemoteStations(q);
+    renderStations(remote);
+    statusEl.textContent = remote.length
+      ? `Search results for “${q}”.`
+      : "No matching railway station found.";
+  } catch (e) {
+    // If the live API is temporarily unavailable, search the built-in station list.
+    const fallback = FALLBACK_STATIONS.filter(s => {
+      const hay = `${s.code} ${s.name} ${s.city}`.toLowerCase();
+      return tokens.every(t => hay.includes(t));
+    });
+    renderStations(fallback);
+    statusEl.textContent = fallback.length
+      ? `Showing built-in results for “${q}”.`
+      : "No matching railway station found.";
+    if (!fallback.length) setError("Live station search is temporarily unavailable.");
+  }
 }
 
 async function loadBoard(station) {

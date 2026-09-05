@@ -234,6 +234,18 @@ export default {
       }
     }
 
+    if (url.pathname === "/stations/search" || url.pathname === "/api/stations/search") {
+      const q = String(url.searchParams.get("q") || "").trim();
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 20), 5), 50);
+      if (!q) return json({ success: true, data: [] });
+      try {
+        const body = await railRadar(`/lookup/search/stations?q=${encodeURIComponent(q)}&limit=${limit}`, env);
+        return json(body);
+      } catch (error) {
+        return json({ success: false, error: error?.message || "Station search failed" }, error?.status || 502);
+      }
+    }
+
     if (url.pathname === "/stations/nearby" || url.pathname === "/api/stations/nearby") {
       const lat = Number(url.searchParams.get("lat"));
       const lon = Number(url.searchParams.get("lon"));

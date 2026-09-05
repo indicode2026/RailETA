@@ -64,7 +64,7 @@ let selectedStation = null;
 let currentTrainNumber = null;
 let lastTrainPayload = null;
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const RAILWAY_PROXY_URL = RAILRADAR_PROXY_URL;
 
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
@@ -105,25 +105,14 @@ async function findNearbyRailwayStations(lat, lon) {
     common metro operators/names. This keeps the result focused on places
     where passenger railway trains stop.
   */
-  const query = `
-[out:json][timeout:30];
-(
-  node["railway"~"^(station|halt)$"](around:50000,${lat},${lon});
-  way["railway"~"^(station|halt)$"](around:50000,${lat},${lon});
-  relation["railway"~"^(station|halt)$"](around:50000,${lat},${lon});
-);
-out center tags;
-`;
 
-  const response = await fetch(OVERPASS_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=UTF-8" },
-    body: query
-  });
 
-  if (!response.ok) throw new Error("Could not retrieve nearby railway stations.");
+  const response = await fetch(`${RAILWAY_PROXY_URL.replace(/\/$/, "")}/stations/nearby?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+
+  if (!response.ok) throw new Error(`Could not retrieve nearby railway stations (HTTP ${response.status}).`);
 
   const data = await response.json();
+  if (!Array.isArray(data.elements)) throw new Error(data.error || "Railway station lookup returned invalid data.");
 
   const metroPattern =
     /\b(metro|subway|underground|tram|light[\s-]?rail|monorail|rapid transit|rapid metro)\b/i;
@@ -300,14 +289,46 @@ function getStationName(routeItem) {
   return routeItem?.stationName || routeItem?.name || routeItem?.stationCode || "Unknown";
 }
 
+function normalizeName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b(junction|jn|railway|railway station|station)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function getTargetRouteIndex(route) {
   if (!selectedStation || !Array.isArray(route)) return -1;
   const targetCode = String(selectedStation.code || "").toUpperCase();
-  if (!targetCode) return -1;
 
-  return route.findIndex(item =>
-    String(item.stationCode || "").toUpperCase() === targetCode
-  );
+  if (targetCode) {
+    const byCode = route.findIndex(item =>
+      String(item.stationCode || "").toUpperCase() === targetCode
+    );
+    if (byCode >= 0) return byCode;
+  }
+
+  const targetName = normalizeName(selectedStation.name);
+  if (targetName) {
+    const byName = route.findIndex(item => normalizeName(item.stationName) === targetName);
+    if (byName >= 0) return byName;
+  }
+
+  // OSM often has no Indian Railways station code. Fall back to the closest
+  // route station to the selected OSM station, provided it is reasonably close.
+  if (Number.isFinite(Number(selectedStation.lat)) && Number.isFinite(Number(selectedStation.lon))) {
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+    route.forEach((item, index) => {
+      const lat = Number(item.lat), lon = Number(item.lng ?? item.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const d = haversineKm(Number(selectedStation.lat), Number(selectedStation.lon), lat, lon);
+      if (d < bestDistance) { bestDistance = d; bestIndex = index; }
+    });
+    if (bestIndex >= 0 && bestDistance <= 8) return bestIndex;
+  }
+
+  return -1;
 }
 
 function calculateEta(data) {

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07111f" />
+  <title>RailETA — Dynamic Train ETA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="brand-icon">🚆</span><span><b>RailETA</b><small>Dynamic Train Forecasting</small></span></a>
+    <div class="live-pill"><i></i> LIVE SYSTEM</div>
+  </header>
+
+  <main id="top" class="shell">
+    <section id="locationView" class="view active">
+      <div class="hero">
+        <div class="hero-badge">SMART RAILWAY ETA</div>
+        <h1>Know where your train is.<br><span>Know when it will arrive.</span></h1>
+        <p>Allow your location and RailETA will find the nearest railway stations, then forecast your train's arrival using live running data.</p>
+        <button id="locateBtn" class="primary-btn">📍 Use my location</button>
+        <p id="locationStatus" class="status-text"></p>
+      </div>
+      <div class="feature-row">
+        <div><strong>01</strong><span>Find nearby stations</span></div>
+        <div><strong>02</strong><span>Select your station</span></div>
+        <div><strong>03</strong><span>Track & forecast ETA</span></div>
+      </div>
+    </section>
+
+    <section id="stationsView" class="view">
+      <div class="section-head"><div><span class="eyebrow">LOCATION FOUND</span><h2>Stations near you</h2><p id="coordsText">Finding the closest stations…</p></div><button class="ghost-btn" id="changeLocationBtn">↻ Refresh</button></div>
+      <div id="stationsList" class="station-list"></div>
+    </section>
+
+    <section id="searchView" class="view">
+      <div class="section-head"><div><span class="eyebrow">STATION SELECTED</span><h2>Track your train</h2><p id="selectedStationText"></p></div><button class="ghost-btn" id="backStationsBtn">← Stations</button></div>
+      <form id="trainForm" class="search-panel">
+        <label for="trainNumber">Train number</label>
+        <div class="input-row"><input id="trainNumber" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="e.g. 12919" required /><button class="primary-btn" type="submit">Track train →</button></div>
+        <p class="hint">Enter the Indian Railways train number. Live data is fetched through your configured RailETA backend.</p>
+      </form>
+      <div id="searchError" class="error-box hidden"></div>
+    </section>
+
+    <section id="dashboardView" class="view">
+      <div class="dashboard-head"><div><span class="eyebrow">LIVE RUNNING STATUS</span><h2 id="trainName">Train</h2><p id="trainMeta">—</p></div><div class="head-actions"><span id="liveBadge" class="live-badge">● LIVE</span><button id="refreshBtn" class="ghost-btn">↻ Refresh</button></div></div>
+      <div id="apiError" class="error-box hidden"></div>
+      <div class="eta-card">
+        <div><span class="card-label">PREDICTED ARRIVAL</span><div id="predictedEta" class="eta-time">—</div><p id="etaExplanation">Waiting for live data…</p></div>
+        <div class="eta-side"><span id="delayValue" class="delay-big">—</span><small>current delay</small></div>
+      </div>
+      <div class="metrics">
+        <article><span>📍 CURRENT</span><strong id="currentLocation">—</strong><small id="currentStatus">—</small></article>
+        <article><span>➡ NEXT STATION</span><strong id="nextStation">—</strong><small id="nextDistance">—</small></article>
+        <article><span>⚡ SPEED</span><strong id="currentSpeed">—</strong><small>km/h</small></article>
+        <article><span>🕐 LAST UPDATE</span><strong id="lastUpdated">—</strong><small>live source</small></article>
+      </div>
+      <div class="content-grid">
+        <div class="panel route-panel"><div class="panel-title"><h3>Journey route</h3><span id="routeSummary">—</span></div><div id="routeList" class="route-list"></div></div>
+        <div class="panel info-panel"><div class="panel-title"><h3>Train details</h3></div><dl><div><dt>Train</dt><dd id="detailNumber">—</dd></div><div><dt>Type</dt><dd id="detailType">—</dd></div><div><dt>From</dt><dd id="detailSource">—</dd></div><div><dt>To</dt><dd id="detailDestination">—</dd></div><div><dt>Distance</dt><dd id="detailDistance">—</dd></div><div><dt>Average speed</dt><dd id="detailAvgSpeed">—</dd></div></dl></div>
+      </div>
+      <div id="exceptionBox" class="warning-box hidden"></div>
+      <div class="footer-note">RailETA forecast uses live running data. Prediction is an estimate, not an official railway guarantee.</div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

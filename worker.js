@@ -13,7 +13,7 @@
 
 const ALLOWED_ORIGIN = "*";
 const API_BASE = "https://api.railradar.in/v1";
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const OVERPASS_URL = "https://overpass.private.coffee/api/interpreter";
 
 function corsHeaders() {
   return {
